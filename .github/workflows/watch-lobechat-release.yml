@@ -1,0 +1,58 @@
+name: watch-lobechat-release
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read last know release
+        id: read_last_release
+        run: |
+          if [ -f latest_release.txt ]; then
+              echo "LAST_RELEASE=$(cat latest_release.txt)" >> $GITHUB_ENV
+            else
+              echo "LAST_RELEASE=" >> $GITHUB_ENV
+            fi
+
+      - name: Check for new release
+        id: check_new_release
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const repo_owner = 'lobehub'
+            const repo_name = 'lobe-chat'
+            const repo = await github.rest.repos.getLatestRelease({
+              owner: repo_owner,
+              repo: repo_name
+            });
+            const latest_release = repo.data.tag_name;
+            console.log(`The latest release is ${latestRelease}`);
+            return latest_release;
+      
+      - name: Compare releases and update if new
+        if: env.LAST_RELEASE != steps.check_new_release.outputs.result
+        run: |
+          echo "A new release has been detected: ${{ steps.check_new_release.outputs.result }}"
+          echo "${{ steps.check_new_release.outputs.result }}" > latest_release.txt
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add latest_release.txt
+          git commit -m "Update latest release to ${{ steps.check_release.outputs.result }}"
+          git push
+
+      - name: Deploy new release
+        if: env.LAST_RELEASE != steps.check_new_release.outputs.result
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-client
+
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa.pem
+          chmod 600 ~/.ssh/id_rsa.pem
+
+          ssh-keyscan -t rsa 52.199.221.18 >> ~/.ssh/known_hosts
+          scp -i ~/.ssh/deploy_key.pem ./your_deploy_script.sh ec2-user@${{ secrets.SSH_ADDRESS }}:/tmp/your_deploy_script.sh
+          ssh -i ~/.ssh/deploy_key.pem ec2-user@${{ secrets.SSH_ADDRESS }} 'bash /tmp/your_deploy_script.sh'
