@@ -2,7 +2,7 @@ name: watch-lobechat-release
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: '*/5 * * * *'
 
 jobs:
   check-release:
