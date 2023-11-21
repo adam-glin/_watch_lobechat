@@ -19,7 +19,7 @@ jobs:
 
       - name: Check for new release
         id: check_new_release
-        uses: actions/github-script@v5
+        uses: actions/github-script@v7
         with:
           script: |
             const repo_owner = 'lobehub'
